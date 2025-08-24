@@ -1,720 +1,524 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>画像モザイク加工アプリ</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>画像モザイク加工アプリ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f0f2f5; min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; padding: 20px; -webkit-tap-highlight-color: transparent;
+    }
+    .container { background: #fff; border-radius: 20px; padding: 30px; box-shadow: 0 8px 32px rgba(0,0,0,.1); max-width: 1000px; width: 100%; }
+    h1 { color: #333; text-align: center; margin-bottom: 30px; font-size: 2.2em; font-weight: 600; background: linear-gradient(45deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #f0f2f5;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
-            -webkit-tap-highlight-color: transparent;
-        }
+    .upload-section { margin-bottom: 30px; text-align: center; }
+    .file-input-wrapper { position: relative; display: inline-block; background: linear-gradient(45deg, #667eea, #764ba2); border-radius: 50px; padding: 15px 30px; color: #fff; font-size: 16px; cursor: pointer; transition: all .3s ease; box-shadow: 0 10px 20px rgba(102,126,234,.2); touch-action: manipulation; }
+    .file-input-wrapper:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(102,126,234,.3); }
+    .file-input { position: absolute; left:0; top:0; width:100%; height:100%; opacity:0; cursor:pointer; }
 
-        .container {
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            max-width: 1000px;
-            width: 100%;
-        }
+    .canvas-container { position: relative; display: none; margin: 20px auto; border-radius: 10px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.1); line-height: 0; }
+    #imageCanvas { display:block; max-width: 100%; height: auto; cursor: crosshair; border-radius: 10px; touch-action: none; }
 
-        h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 2.2em;
-            font-weight: 600;
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
+    .selection-overlay { position: absolute; border: 2px dashed #ff6b6b; background: rgba(255,107,107,.2); pointer-events: none; display: none; }
 
-        .upload-section {
-            margin-bottom: 30px;
-            text-align: center;
-        }
+    .controls { display:none; text-align:center; margin-top:20px; gap:20px; flex-direction: column; align-items: center; }
+    .controls.show { display:flex; }
 
-        .file-input-wrapper {
-            position: relative;
-            display: inline-block;
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            border-radius: 50px;
-            padding: 15px 30px;
-            color: white;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.2);
-            touch-action: manipulation;
-        }
+    .mode-selector { display:flex; gap:10px; margin-bottom:20px; justify-content:center; flex-wrap:wrap; }
+    .btn-mode { background:#f8f9fa; color:#555; border:2px solid #dee2e6; transition: all .3s ease; }
+    .btn-mode.active { background: linear-gradient(45deg, #667eea, #764ba2); color:#fff; border-color: transparent; box-shadow: 0 4px 15px rgba(102,126,234,.3); }
+    .btn-mode:hover:not(.active){ transform: translateY(-1px); border-color:#aaa; }
 
-        .file-input-wrapper:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 30px rgba(102, 126, 234, 0.3);
-        }
+    .control-group { display:flex; flex-direction:column; align-items:center; gap:8px; margin-bottom:15px; width:100%; max-width:300px; }
+    .control-group label { font-weight:500; color:#555; font-size:14px; }
 
-        .file-input {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            opacity: 0;
-            cursor: pointer;
-        }
+    .color-picker { width:80px; height:40px; border:2px solid #dee2e6; border-radius:10px; cursor:pointer; background:none; outline:none; }
+    .color-picker::-webkit-color-swatch-wrapper{ padding:0; }
+    .color-picker::-webkit-color-swatch{ border-radius:6px; border:none; }
 
-        .canvas-container {
-            position: relative;
-            display: none;
-            margin: 20px auto;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            line-height: 0; /* キャンバス下の余白を削除 */
-        }
+    .style-selector { padding:8px 15px; border:2px solid #dee2e6; border-radius:20px; background:#fff; font-size:14px; outline:none; cursor:pointer; }
+    .style-selector:focus { border-color:#667eea; box-shadow:0 0 0 3px rgba(102,126,234,.1); }
 
-        #imageCanvas {
-            display: block;
-            max-width: 100%;
-            height: auto; /* アスペクト比を維持 */
-            cursor: crosshair;
-            border-radius: 10px;
-            touch-action: none; /* iOSでのダブルタップズームなどを無効化 */
-        }
+    .action-buttons { display:flex; gap:15px; flex-wrap:wrap; justify-content:center; margin-top:20px; }
 
-        .selection-overlay {
-            position: absolute;
-            border: 2px dashed #ff6b6b;
-            background: rgba(255, 107, 107, 0.2);
-            pointer-events: none;
-            display: none;
-        }
+    .slider { width:100%; height:8px; border-radius:4px; background:#ddd; outline:none; -webkit-appearance: none; appearance: none; }
+    .slider::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50%; background: linear-gradient(45deg, #667eea, #764ba2); cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.2); }
+    .slider::-moz-range-thumb{ width:22px; height:22px; border-radius:50%; background: linear-gradient(45deg, #667eea, #764ba2); cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.2); border:none; }
 
-        .controls {
-            display: none;
-            text-align: center;
-            margin-top: 20px;
-            gap: 20px;
-            flex-direction: column;
-            align-items: center;
-        }
+    .btn { padding:12px 24px; border:none; border-radius:25px; font-size:14px; font-weight:500; cursor:pointer; transition: all .3s ease; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 15px rgba(0,0,0,.1); }
+    .btn-primary { background: linear-gradient(45deg, #667eea, #764ba2); color:#fff; }
+    .btn-secondary { background:#f0f2f5; color:#555; }
+    .btn-success { background: linear-gradient(45deg, #56ab2f, #a8e6cf); color:#fff; }
+    .btn:hover{ transform: translateY(-2px); box-shadow:0 8px 25px rgba(0,0,0,.15); }
+    .btn:disabled{ opacity:.5; cursor:not-allowed; transform:none; box-shadow:0 4px 15px rgba(0,0,0,.1); }
 
-        .controls.show {
-            display: flex;
-        }
+    .instruction { background: rgba(102,126,234,.1); border-left:4px solid #667eea; padding:15px; border-radius:8px; margin:20px 0; font-size:14px; color:#555; display:none; }
+    .instruction.show{ display:block; }
 
-        .mode-selector {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .btn-mode {
-            background: #f8f9fa;
-            color: #555;
-            border: 2px solid #dee2e6;
-            transition: all 0.3s ease;
-        }
-
-        .btn-mode.active {
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white;
-            border-color: transparent;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-        }
-
-        .btn-mode:hover:not(.active) {
-            transform: translateY(-1px);
-            border-color: #aaa;
-        }
-
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 15px;
-            width: 100%;
-            max-width: 300px;
-        }
-
-        .control-group label {
-            font-weight: 500;
-            color: #555;
-            font-size: 14px;
-        }
-
-        .color-picker {
-            width: 80px;
-            height: 40px;
-            border: 2px solid #dee2e6;
-            border-radius: 10px;
-            cursor: pointer;
-            background: none;
-            outline: none;
-        }
-        
-        /* For Webkit browsers */
-        .color-picker::-webkit-color-swatch-wrapper {
-            padding: 0;
-        }
-        .color-picker::-webkit-color-swatch {
-            border-radius: 6px;
-            border: none;
-        }
-
-        .style-selector {
-            padding: 8px 15px;
-            border: 2px solid #dee2e6;
-            border-radius: 20px;
-            background: white;
-            font-size: 14px;
-            outline: none;
-            cursor: pointer;
-        }
-
-        .style-selector:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            justify-content: center;
-            margin-top: 20px;
-        }
-
-        .slider {
-            width: 100%;
-            height: 8px;
-            border-radius: 4px;
-            background: #ddd;
-            outline: none;
-            -webkit-appearance: none;
-            appearance: none;
-        }
-
-        .slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-        }
-
-        .slider::-moz-range-thumb {
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-            border: none;
-        }
-
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 25px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        .btn-primary {
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white;
-        }
-
-        .btn-secondary {
-            background: #f0f2f5;
-            color: #555;
-        }
-
-        .btn-success {
-            background: linear-gradient(45deg, #56ab2f, #a8e6cf);
-            color: white;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        .instruction {
-            background: rgba(102, 126, 234, 0.1);
-            border-left: 4px solid #667eea;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
-            font-size: 14px;
-            color: #555;
-            display: none;
-        }
-
-        .instruction.show {
-            display: block;
-        }
-
-        @media (max-width: 768px) {
-            body {
-                padding: 10px;
-            }
-            .container {
-                padding: 20px;
-                margin: 0;
-            }
-            h1 {
-                font-size: 1.8em;
-                margin-bottom: 20px;
-            }
-            .btn {
-                width: 100%;
-                max-width: 320px;
-                padding: 15px 20px;
-                font-size: 16px;
-            }
-            .file-input-wrapper {
-                width: 100%;
-                max-width: 320px;
-                padding: 18px 30px;
-                font-size: 16px;
-            }
-        }
-    </style>
+    @media (max-width: 768px) {
+      body{ padding:10px; }
+      .container{ padding:20px; margin:0; }
+      h1{ font-size:1.8em; margin-bottom:20px; }
+      .btn{ width:100%; max-width:320px; padding:15px 20px; font-size:16px; }
+      .file-input-wrapper{ width:100%; max-width:320px; padding:18px 30px; font-size:16px; }
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>📸 画像モザイク加工アプリ</h1>
-        
-        <div class="upload-section">
-            <label class="file-input-wrapper">
-                <input type="file" id="imageInput" class="file-input" accept="image/*">
-                📁 画像を選択してください
-            </label>
-        </div>
+  <div class="container">
+    <h1>📸 画像モザイク加工アプリ</h1>
 
-        <div class="instruction" id="instruction">
-            <strong>使い方:</strong> 
-            <span id="instructionText">指またはマウスでドラッグして範囲を選択し、下のボタンを押してください。</span>
-        </div>
-
-        <div class="canvas-container" id="canvasContainer">
-            <canvas id="imageCanvas"></canvas>
-            <div class="selection-overlay" id="selectionOverlay"></div>
-        </div>
-
-        <div class="controls" id="controls">
-            <div class="mode-selector">
-                <button id="mosaicMode" class="btn btn-mode active">🎨 モザイク</button>
-                <button id="markMode" class="btn btn-mode">🖍️ マーク</button>
-            </div>
-
-            <div id="mosaicControls">
-                <div class="control-group">
-                    <label for="mosaicSize">モザイクの粗さ</label>
-                    <input type="range" id="mosaicSize" class="slider" min="5" max="50" value="15">
-                    <span id="mosaicSizeValue">15px</span>
-                </div>
-                <div class="control-group">
-                    <label for="opacity">不透明度</label>
-                    <input type="range" id="opacity" class="slider" min="0" max="100" value="100">
-                    <span id="opacityValue">100%</span>
-                </div>
-            </div>
-
-            <div id="markControls" style="display: none;">
-                <div class="control-group">
-                    <label for="markColor">マークの色</label>
-                    <input type="color" id="markColor" value="#ff0000" class="color-picker">
-                </div>
-                <div class="control-group">
-                    <label for="markThickness">線の太さ</label>
-                    <input type="range" id="markThickness" class="slider" min="2" max="20" value="3">
-                    <span id="markThicknessValue">3px</span>
-                </div>
-                <div class="control-group">
-                    <label for="markStyle">マークの種類</label>
-                    <select id="markStyle" class="style-selector">
-                        <option value="stroke">枠線のみ</option>
-                        <option value="fill">塗りつぶし</option>
-                        <option value="both">枠線+塗りつぶし</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="action-buttons">
-                <button id="applyButton" class="btn btn-primary" disabled>🎨 適用する</button>
-                <button id="clearSelection" class="btn btn-secondary" disabled>🗑️ 選択クリア</button>
-                <button id="resetImage" class="btn btn-secondary" disabled>↩️ 元に戻す</button>
-                <a id="downloadLink" class="btn btn-success" style="display: none;">💾 ダウンロード</a>
-            </div>
-        </div>
+    <div class="upload-section">
+      <label class="file-input-wrapper">
+        <input type="file" id="imageInput" class="file-input" accept="image/*" />
+        📁 画像を選択してください
+      </label>
     </div>
 
-    <script>
-        class ImageMosaicApp {
-            constructor() {
-                this.initElements();
-                
-                this.ctx = this.canvas.getContext('2d');
-                this.originalImageData = null;
-                this.currentImageData = null;
-                this.isSelecting = false;
-                this.selectionStart = { x: 0, y: 0 };
-                this.selectionEnd = { x: 0, y: 0 };
-                this.currentMode = 'mosaic';
-                this.animationFrameId = null;
+    <div class="instruction" id="instruction">
+      <strong>使い方:</strong>
+      <span id="instructionText">指またはマウスでドラッグして範囲を選択し、下のボタンを押してください。</span>
+    </div>
 
-                this.initEventListeners();
-            }
+    <div class="canvas-container" id="canvasContainer">
+      <canvas id="imageCanvas"></canvas>
+      <div class="selection-overlay" id="selectionOverlay"></div>
+    </div>
 
-            initElements() {
-                this.container = document.querySelector('.container');
-                this.canvas = document.getElementById('imageCanvas');
-                this.imageInput = document.getElementById('imageInput');
-                this.canvasContainer = document.getElementById('canvasContainer');
-                this.selectionOverlay = document.getElementById('selectionOverlay');
-                this.controls = document.getElementById('controls');
-                this.instruction = document.getElementById('instruction');
-                
-                this.mosaicModeBtn = document.getElementById('mosaicMode');
-                this.markModeBtn = document.getElementById('markMode');
-                this.mosaicControls = document.getElementById('mosaicControls');
-                this.markControls = document.getElementById('markControls');
-                
-                this.mosaicSizeSlider = document.getElementById('mosaicSize');
-                this.opacitySlider = document.getElementById('opacity');
-                this.markColorPicker = document.getElementById('markColor');
-                this.markThicknessSlider = document.getElementById('markThickness');
-                this.markStyleSelect = document.getElementById('markStyle');
-                
-                this.applyButton = document.getElementById('applyButton');
-                this.clearSelectionButton = document.getElementById('clearSelection');
-                this.resetButton = document.getElementById('resetImage');
-                this.downloadLink = document.getElementById('downloadLink');
-            }
+    <div class="controls" id="controls">
+      <div class="mode-selector">
+        <button id="mosaicMode" class="btn btn-mode active">🎨 モザイク</button>
+        <button id="markMode" class="btn btn-mode">🖍️ マーク</button>
+      </div>
 
-            initEventListeners() {
-                this.imageInput.addEventListener('change', (e) => this.loadImage(e.target.files[0]));
+      <div id="mosaicControls">
+        <div class="control-group">
+          <label for="mosaicSize">モザイクの粗さ</label>
+          <input type="range" id="mosaicSize" class="slider" min="5" max="50" value="15" />
+          <span id="mosaicSizeValue">15px</span>
+        </div>
+        <div class="control-group">
+          <label for="opacity">不透明度</label>
+          <input type="range" id="opacity" class="slider" min="0" max="100" value="100" />
+          <span id="opacityValue">100%</span>
+        </div>
+      </div>
 
-                this.canvas.addEventListener('mousedown', (e) => this.startSelection(e), { passive: false });
-                this.canvas.addEventListener('touchstart', (e) => this.startSelection(e), { passive: false });
-                
-                window.addEventListener('mousemove', (e) => this.updateSelection(e), { passive: false });
-                window.addEventListener('touchmove', (e) => this.updateSelection(e), { passive: false });
+      <div id="markControls" style="display:none;">
+        <div class="control-group">
+          <label for="markColor">マークの色</label>
+          <input type="color" id="markColor" value="#ff0000" class="color-picker" />
+        </div>
+        <div class="control-group">
+          <label for="markThickness">線の太さ</label>
+          <input type="range" id="markThickness" class="slider" min="2" max="20" value="3" />
+          <span id="markThicknessValue">3px</span>
+        </div>
+        <div class="control-group">
+          <label for="markStyle">マークの種類</label>
+          <select id="markStyle" class="style-selector">
+            <option value="stroke">枠線のみ</option>
+            <option value="fill">塗りつぶし</option>
+            <option value="both">枠線+塗りつぶし</option>
+          </select>
+        </div>
+      </div>
 
-                window.addEventListener('mouseup', (e) => this.endSelection(e));
-                window.addEventListener('touchend', (e) => this.endSelection(e));
+      <div class="action-buttons">
+        <button id="applyButton" class="btn btn-primary" disabled>🎨 適用する</button>
+        <button id="clearSelection" class="btn btn-secondary" disabled>🗑️ 選択クリア</button>
+        <button id="resetImage" class="btn btn-secondary" disabled>↩️ 元に戻す</button>
+        <a id="downloadLink" class="btn btn-success" style="display:none;">💾 ダウンロード</a>
+      </div>
+    </div>
+  </div>
 
-                this.mosaicModeBtn.addEventListener('click', () => this.switchMode('mosaic'));
-                this.markModeBtn.addEventListener('click', () => this.switchMode('mark'));
+  <script>
+    const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
 
-                this.mosaicSizeSlider.addEventListener('input', (e) => {
-                    document.getElementById('mosaicSizeValue').textContent = e.target.value + 'px';
-                });
-                this.opacitySlider.addEventListener('input', (e) => {
-                    document.getElementById('opacityValue').textContent = e.target.value + '%';
-                });
-                this.markThicknessSlider.addEventListener('input', (e) => {
-                    document.getElementById('markThicknessValue').textContent = e.target.value + 'px';
-                });
+    class ImageMosaicApp {
+      constructor() {
+        this.initElements();
+        this.ctx = this.canvas.getContext('2d');
+        this.originalImageData = null;
+        this.currentImageData = null;
 
-                this.applyButton.addEventListener('click', () => this.applyEffect());
-                this.clearSelectionButton.addEventListener('click', () => this.clearSelection());
-                this.resetButton.addEventListener('click', () => this.resetImage());
-            }
+        this.isSelecting = false;
+        this.pointerId = null;
+        this.selectionStart = { x: 0, y: 0 };
+        this.selectionEnd = { x: 0, y: 0 };
+        this.currentMode = 'mosaic';
+        this.animationFrameId = null;
 
-            switchMode(mode) {
-                this.currentMode = mode;
-                this.mosaicModeBtn.classList.toggle('active', mode === 'mosaic');
-                this.markModeBtn.classList.toggle('active', mode === 'mark');
-                this.mosaicControls.style.display = mode === 'mosaic' ? 'block' : 'none';
-                this.markControls.style.display = mode === 'mark' ? 'block' : 'none';
-                this.drawSelectionOverlay();
-            }
+        this.initEventListeners();
+      }
 
-            loadImage(file) {
-                if (!file || !file.type.startsWith('image/')) return;
+      initElements() {
+        this.container = document.querySelector('.container');
+        this.canvas = document.getElementById('imageCanvas');
+        this.imageInput = document.getElementById('imageInput');
+        this.canvasContainer = document.getElementById('canvasContainer');
+        this.selectionOverlay = document.getElementById('selectionOverlay');
+        this.controls = document.getElementById('controls');
+        this.instruction = document.getElementById('instruction');
+        this.instructionText = document.getElementById('instructionText');
 
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        this.setupCanvas(img);
-                        this.controls.classList.add('show');
-                        this.instruction.classList.add('show');
-                        this.resetButton.disabled = false;
-                        this.downloadLink.style.display = 'none';
-                    };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            }
+        this.mosaicModeBtn = document.getElementById('mosaicMode');
+        this.markModeBtn = document.getElementById('markMode');
+        this.mosaicControls = document.getElementById('mosaicControls');
+        this.markControls = document.getElementById('markControls');
 
-            setupCanvas(img) {
-                const containerWidth = this.container.clientWidth - (this.container.style.paddingLeft || 0) * 2;
-                const maxWidth = Math.min(1000, containerWidth);
-                let { width, height } = img;
+        this.mosaicSizeSlider = document.getElementById('mosaicSize');
+        this.opacitySlider = document.getElementById('opacity');
+        this.markColorPicker = document.getElementById('markColor');
+        this.markThicknessSlider = document.getElementById('markThickness');
+        this.markStyleSelect = document.getElementById('markStyle');
 
-                if (width > maxWidth) {
-                    height = (height * maxWidth) / width;
-                    width = maxWidth;
-                }
+        this.applyButton = document.getElementById('applyButton');
+        this.clearSelectionButton = document.getElementById('clearSelection');
+        this.resetButton = document.getElementById('resetImage');
+        this.downloadLink = document.getElementById('downloadLink');
+      }
 
-                this.canvas.width = width;
-                this.canvas.height = height;
-                this.ctx.drawImage(img, 0, 0, width, height);
-                
-                this.originalImageData = this.ctx.getImageData(0, 0, width, height);
-                this.currentImageData = this.ctx.getImageData(0, 0, width, height);
-                
-                this.canvasContainer.style.display = 'block';
-            }
+      initEventListeners() {
+        this.imageInput.addEventListener('change', (e) => this.loadImage(e.target.files[0]));
 
-            getEventPos(e) {
-                const rect = this.canvas.getBoundingClientRect();
-                const touch = e.changedTouches ? e.changedTouches[0] : e;
-                
-                const scaleX = this.canvas.width / rect.width;
-                const scaleY = this.canvas.height / rect.height;
-                
-                return {
-                    x: (touch.clientX - rect.left) * scaleX,
-                    y: (touch.clientY - rect.top) * scaleY
-                };
-            }
+        this.canvas.addEventListener('pointerdown', (e) => this.startSelection(e), { passive: false });
+        this.canvas.addEventListener('pointermove', (e) => this.updateSelection(e), { passive: false });
+        this.canvas.addEventListener('pointerup', (e) => this.endSelection(e));
+        this.canvas.addEventListener('pointercancel', (e) => this.endSelection(e));
+        this.canvas.addEventListener('lostpointercapture', () => { this.isSelecting = false; this.pointerId = null; });
 
-            startSelection(e) {
-                if (e.target !== this.canvas) return;
-                e.preventDefault();
-                this.isSelecting = true;
-                const pos = this.getEventPos(e);
-                this.selectionStart = pos;
-                this.selectionEnd = pos;
-                this.drawSelectionOverlay();
-            }
+        this.mosaicModeBtn.addEventListener('click', () => this.switchMode('mosaic'));
+        this.markModeBtn.addEventListener('click', () => this.switchMode('mark'));
 
-            updateSelection(e) {
-                if (!this.isSelecting) return;
-                e.preventDefault();
-                this.selectionEnd = this.getEventPos(e);
-                
-                if (!this.animationFrameId) {
-                    this.animationFrameId = requestAnimationFrame(() => {
-                        this.drawSelectionOverlay();
-                        this.animationFrameId = null;
-                    });
-                }
-            }
+        this.mosaicSizeSlider.addEventListener('input', (e) => {
+          document.getElementById('mosaicSizeValue').textContent = e.target.value + 'px';
+        });
+        this.opacitySlider.addEventListener('input', (e) => {
+          document.getElementById('opacityValue').textContent = e.target.value + '%';
+        });
+        this.markThicknessSlider.addEventListener('input', (e) => {
+          document.getElementById('markThicknessValue').textContent = e.target.value + 'px';
+        });
 
-            endSelection() {
-                if (!this.isSelecting) return;
-                this.isSelecting = false;
-                cancelAnimationFrame(this.animationFrameId);
-                this.animationFrameId = null;
+        this.applyButton.addEventListener('click', () => this.applyEffect());
+        this.clearSelectionButton.addEventListener('click', () => this.clearSelection());
+        this.resetButton.addEventListener('click', () => this.resetImage());
+      }
 
-                const { width, height } = this.getSelectionRect();
-                if (width > 1 && height > 1) {
-                    this.applyButton.disabled = false;
-                    this.clearSelectionButton.disabled = false;
-                }
-            }
+      switchMode(mode) {
+        this.currentMode = mode;
+        this.mosaicModeBtn.classList.toggle('active', mode === 'mosaic');
+        this.markModeBtn.classList.toggle('active', mode === 'mark');
+        this.mosaicControls.style.display = mode === 'mosaic' ? 'block' : 'none';
+        this.markControls.style.display = mode === 'mark' ? 'block' : 'none';
+        this.instructionText.textContent = mode === 'mosaic'
+          ? 'ドラッグで範囲を選択 → 「適用する」でモザイク'
+          : 'ドラッグで範囲を選択 → 「適用する」でマーク';
+        this.drawSelectionOverlay();
+      }
 
-            getSelectionRect() {
-                const x = Math.min(this.selectionStart.x, this.selectionEnd.x);
-                const y = Math.min(this.selectionStart.y, this.selectionEnd.y);
-                const width = Math.abs(this.selectionEnd.x - this.selectionStart.x);
-                const height = Math.abs(this.selectionEnd.y - this.selectionStart.y);
-                return { x, y, width, height };
-            }
+      loadImage(file) {
+        if (!file || !file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            this.setupCanvas(img);
+            this.controls.classList.add('show');
+            this.instruction.classList.add('show');
+            this.resetButton.disabled = false;
+            this.downloadLink.style.display = 'none';
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
 
-            drawSelectionOverlay() {
-                const rect = this.canvas.getBoundingClientRect();
-                const scaleX = rect.width / this.canvas.width;
-                const scaleY = rect.height / this.canvas.height;
-                const { x, y, width, height } = this.getSelectionRect();
+      setupCanvas(img) {
+        const containerWidth = this.container.clientWidth;
+        const maxLongSide = 2000;
 
-                if (width === 0 && height === 0 && !this.isSelecting) {
-                     this.selectionOverlay.style.display = 'none';
-                     return;
-                }
+        let { width, height } = img;
 
-                this.selectionOverlay.style.display = 'block';
-                this.selectionOverlay.style.left = (x * scaleX) + 'px';
-                this.selectionOverlay.style.top = (y * scaleY) + 'px';
-                this.selectionOverlay.style.width = (width * scaleX) + 'px';
-                this.selectionOverlay.style.height = (height * scaleY) + 'px';
-                
-                const color = this.currentMode === 'mark' ? this.markColorPicker.value : '#ff6b6b';
-                this.selectionOverlay.style.borderColor = color;
-                this.selectionOverlay.style.backgroundColor = color + '33'; // 20% opacity in hex
-            }
+        const targetW = Math.min(1000, containerWidth);
+        const scaleToFit = width > targetW ? targetW / width : 1;
 
-            applyEffect() {
-                const { x, y, width, height } = this.getSelectionRect();
-                if (width < 1 || height < 1) return;
+        const longSide = Math.max(width, height) * scaleToFit;
+        const scaleLong = longSide > maxLongSide ? maxLongSide / longSide : 1;
 
-                this.ctx.putImageData(this.currentImageData, 0, 0);
-                
-                if (this.currentMode === 'mosaic') {
-                    this.applyMosaic(x, y, width, height);
-                } else {
-                    this.applyMark(x, y, width, height);
-                }
-                
-                this.currentImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-                this.clearSelection();
-                this.updateDownloadLink();
-            }
-            
-            // ★★★ 修正点 ★★★
-            applyMosaic(x, y, width, height) {
-                const mosaicSize = parseInt(this.mosaicSizeSlider.value);
-                const opacity = parseFloat(this.opacitySlider.value) / 100;
-                
-                // 選択範囲のピクセルデータを取得
-                const imageData = this.ctx.getImageData(x, y, width, height);
-                const data = imageData.data;
+        const scale = scaleToFit * scaleLong;
+        const cssW = Math.max(1, Math.round(width * scale));
+        const cssH = Math.max(1, Math.round(height * scale));
 
-                // モザイク処理
-                for (let dy = 0; dy < height; dy += mosaicSize) {
-                    for (let dx = 0; dx < width; dx += mosaicSize) {
-                        let r = 0, g = 0, b = 0, count = 0;
-                        const blockHeight = Math.min(mosaicSize, height - dy);
-                        const blockWidth = Math.min(mosaicSize, width - dx);
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+        this.canvas.style.width = cssW + 'px';
+        this.canvas.style.height = cssH + 'px';
+        this.canvas.width = Math.round(cssW * dpr);
+        this.canvas.height = Math.round(cssH * dpr);
 
-                        for (let by = 0; by < blockHeight; by++) {
-                            for (let bx = 0; bx < blockWidth; bx++) {
-                                const index = ((dy + by) * width + (dx + bx)) * 4;
-                                r += data[index];
-                                g += data[index + 1];
-                                b += data[index + 2];
-                                count++;
-                            }
-                        }
-                        
-                        if (count > 0) {
-                            r = Math.round(r / count);
-                            g = Math.round(g / count);
-                            b = Math.round(b / count);
-                            
-                            for (let by = 0; by < blockHeight; by++) {
-                                for (let bx = 0; bx < blockWidth; bx++) {
-                                    const index = ((dy + by) * width + (dx + bx)) * 4;
-                                    data[index] = r;
-                                    data[index + 1] = g;
-                                    data[index + 2] = b;
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // オフスクリーンキャンバスを使って不透明度を適用
-                const offscreenCanvas = document.createElement('canvas');
-                offscreenCanvas.width = width;
-                offscreenCanvas.height = height;
-                const offscreenCtx = offscreenCanvas.getContext('2d');
-                offscreenCtx.putImageData(imageData, 0, 0);
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-                this.ctx.save();
-                this.ctx.globalAlpha = opacity;
-                this.ctx.drawImage(offscreenCanvas, x, y);
-                this.ctx.restore();
-            }
+        this.ctx.clearRect(0, 0, cssW, cssH);
+        this.ctx.drawImage(img, 0, 0, cssW, cssH);
 
+        this.originalImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+        this.currentImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
 
-            applyMark(x, y, width, height) {
-                const color = this.markColorPicker.value;
-                const thickness = parseInt(this.markThicknessSlider.value);
-                const style = this.markStyleSelect.value;
+        this.canvasContainer.style.display = 'block';
+      }
 
-                this.ctx.save();
-                this.ctx.strokeStyle = color;
-                this.ctx.fillStyle = color;
-                this.ctx.lineWidth = thickness;
+      getEventPos(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        return {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        };
+      }
 
-                if (style === 'fill' || style === 'both') {
-                    this.ctx.globalAlpha = 0.4;
-                    this.ctx.fillRect(x, y, width, height);
-                }
-                if (style === 'stroke' || style === 'both') {
-                    this.ctx.globalAlpha = 1.0;
-                    this.ctx.strokeRect(x, y, width, height);
-                }
-                this.ctx.restore();
-            }
+      startSelection(e) {
+        if (e.button !== undefined && e.button !== 0) return;
+        e.preventDefault();
+        this.canvas.setPointerCapture(e.pointerId);
+        this.pointerId = e.pointerId;
+        this.isSelecting = true;
+        const pos = this.getEventPos(e);
+        this.selectionStart = pos;
+        this.selectionEnd = pos;
+        this.drawSelectionOverlay();
+      }
 
-            clearSelection() {
-                this.selectionStart = { x: 0, y: 0 };
-                this.selectionEnd = { x: 0, y: 0 };
-                this.drawSelectionOverlay();
-                this.applyButton.disabled = true;
-                this.clearSelectionButton.disabled = true;
-            }
+      updateSelection(e) {
+        if (!this.isSelecting || e.pointerId !== this.pointerId) return;
+        e.preventDefault();
+        this.selectionEnd = this.getEventPos(e);
+        if (!this.animationFrameId) {
+          this.animationFrameId = requestAnimationFrame(() => {
+            this.drawSelectionOverlay();
+            this.animationFrameId = null;
+          });
+        }
+      }
 
-            resetImage() {
-                if (this.originalImageData) {
-                    this.ctx.putImageData(this.originalImageData, 0, 0);
-                    this.currentImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-                    this.clearSelection();
-                    this.downloadLink.style.display = 'none';
-                }
-            }
+      endSelection(e) {
+        if (e && this.pointerId !== null && e.pointerId !== this.pointerId) return;
+        this.isSelecting = false;
+        this.pointerId = null;
+        if (this.animationFrameId) {
+          cancelAnimationFrame(this.animationFrameId);
+          this.animationFrameId = null;
+        }
+        const { width, height } = this.getSelectionRect(true);
+        const valid = width > 1 && height > 1;
+        this.applyButton.disabled = !valid;
+        this.clearSelectionButton.disabled = !valid;
+      }
 
-            updateDownloadLink() {
-                this.canvas.toBlob((blob) => {
-                    if (this.downloadLink.href) {
-                        URL.revokeObjectURL(this.downloadLink.href);
-                    }
-                    const url = URL.createObjectURL(blob);
-                    this.downloadLink.href = url;
-                    const timestamp = new Date().toISOString().replace(/[-:.]/g, "").replace("T", "_").slice(0, 15);
-                    this.downloadLink.download = `processed_image_${timestamp}.png`;
-                    this.downloadLink.style.display = 'inline-flex';
-                }, 'image/png');
-            }
+      getSelectionRect(clampToCanvas = false) {
+        let x1 = this.selectionStart.x;
+        let y1 = this.selectionStart.y;
+        let x2 = this.selectionEnd.x;
+        let y2 = this.selectionEnd.y;
+
+        if (clampToCanvas) {
+          const rect = this.canvas.getBoundingClientRect();
+          x1 = clamp(x1, 0, rect.width);
+          y1 = clamp(y1, 0, rect.height);
+          x2 = clamp(x2, 0, rect.width);
+          y2 = clamp(y2, 0, rect.height);
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            new ImageMosaicApp();
-        });
-    </script>
+        const x = Math.min(x1, x2);
+        const y = Math.min(y1, y2);
+        const w = Math.abs(x2 - x1);
+        const h = Math.abs(y2 - y1);
+        return { x, y, width: w, height: h };
+      }
+
+      cssToInternalRect(rectCss) {
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = this.canvas.width / rect.width;
+        const scaleY = this.canvas.height / rect.height;
+        return {
+          x: Math.floor(rectCss.x * scaleX),
+          y: Math.floor(rectCss.y * scaleY),
+          width: Math.max(0, Math.floor(rectCss.width * scaleX)),
+          height: Math.max(0, Math.floor(rectCss.height * scaleY)),
+        };
+      }
+
+      drawSelectionOverlay() {
+        const { x, y, width, height } = this.getSelectionRect(true);
+        if (width === 0 && height === 0 && !this.isSelecting) {
+          this.selectionOverlay.style.display = 'none';
+          return;
+        }
+        this.selectionOverlay.style.display = 'block';
+        this.selectionOverlay.style.left = x + 'px';
+        this.selectionOverlay.style.top = y + 'px';
+        this.selectionOverlay.style.width = width + 'px';
+        this.selectionOverlay.style.height = height + 'px';
+        const color = this.currentMode === 'mark' ? this.markColorPicker.value : '#ff6b6b';
+        this.selectionOverlay.style.borderColor = color;
+        this.selectionOverlay.style.backgroundColor = color.length === 7 ? color + '33' : color;
+      }
+
+      applyEffect() {
+        const rectCss = this.getSelectionRect(true);
+        if (rectCss.width < 1 || rectCss.height < 1) return;
+
+        this.ctx.putImageData(this.currentImageData, 0, 0);
+
+        if (this.currentMode === 'mosaic') {
+          this.applyMosaic(rectCss);
+        } else {
+          this.applyMark(rectCss);
+        }
+
+        this.currentImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+
+        this.clearSelection();
+        this.updateDownloadLink();
+      }
+
+      applyMosaic(rectCss) {
+        const dpr = this.canvas.width / this.canvas.getBoundingClientRect().width;
+        const mosaicSize = parseInt(this.mosaicSizeSlider.value, 10) * dpr;
+        const opacity = parseFloat(this.opacitySlider.value) / 100;
+        
+        const rect = this.cssToInternalRect(rectCss);
+        const { x, y, width, height } = rect;
+        
+        let imageData;
+        try {
+          imageData = this.ctx.getImageData(x, y, width, height);
+        } catch (err) {
+          console.warn('getImageData failed (clamping fallback):', err);
+          const x2 = Math.min(x + width, this.canvas.width);
+          const y2 = Math.min(y + height, this.canvas.height);
+          const w2 = Math.max(0, x2 - x);
+          const h2 = Math.max(0, y2 - y);
+          if (w2 === 0 || h2 === 0) return;
+          imageData = this.ctx.getImageData(x, y, w2, h2);
+        }
+
+        const data = imageData.data;
+        const iw = imageData.width;
+        const ih = imageData.height;
+
+        for (let dy = 0; dy < ih; dy += mosaicSize) {
+          for (let dx = 0; dx < iw; dx += mosaicSize) {
+            let r = 0, g = 0, b = 0, count = 0;
+            const blockH = Math.min(mosaicSize, ih - dy);
+            const blockW = Math.min(mosaicSize, iw - dx);
+            
+            for (let by = 0; by < blockH; by++) {
+              for (let bx = 0; bx < blockW; bx++) {
+                const idx = ((dy + by) * iw + (dx + bx)) * 4;
+                r += data[idx];
+                g += data[idx + 1];
+                b += data[idx + 2];
+                count++;
+              }
+            }
+            
+            if (count) {
+              r = Math.round(r / count);
+              g = Math.round(g / count);
+              b = Math.round(b / count);
+              
+              for (let by = 0; by < blockH; by++) {
+                for (let bx = 0; bx < blockW; bx++) {
+                  const idx = ((dy + by) * iw + (dx + bx)) * 4;
+                  data[idx] = r;
+                  data[idx + 1] = g;
+                  data[idx + 2] = b;
+                }
+              }
+            }
+          }
+        }
+
+        const tmp = document.createElement('canvas');
+        tmp.width = width;
+        tmp.height = height;
+        const tctx = tmp.getContext('2d');
+        tctx.putImageData(imageData, 0, 0);
+
+        this.ctx.save();
+        this.ctx.globalAlpha = opacity;
+        this.ctx.putImageData(imageData, x, y);
+        this.ctx.restore();
+      }
+
+      applyMark(rectCss) {
+        const { x, y, width, height } = rectCss;
+        const color = this.markColorPicker.value;
+        const thickness = parseInt(this.markThicknessSlider.value, 10);
+        const style = this.markStyleSelect.value;
+
+        this.ctx.save();
+        this.ctx.strokeStyle = color;
+        this.ctx.fillStyle = color;
+        this.ctx.lineWidth = thickness;
+
+        if (style === 'fill' || style === 'both') {
+          this.ctx.globalAlpha = 0.4;
+          this.ctx.fillRect(x, y, width, height);
+        }
+        if (style === 'stroke' || style === 'both') {
+          this.ctx.globalAlpha = 1.0;
+          this.ctx.strokeRect(x + 0.5, y + 0.5, Math.max(0, width - 1), Math.max(0, height - 1));
+        }
+        this.ctx.restore();
+      }
+
+      clearSelection() {
+        this.selectionStart = { x: 0, y: 0 };
+        this.selectionEnd = { x: 0, y: 0 };
+        this.drawSelectionOverlay();
+        this.applyButton.disabled = true;
+        this.clearSelectionButton.disabled = true;
+      }
+
+      resetImage() {
+        if (!this.originalImageData) return;
+        this.ctx.putImageData(this.originalImageData, 0, 0);
+        this.currentImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+        this.clearSelection();
+        this.downloadLink.style.display = 'none';
+      }
+
+      updateDownloadLink() {
+        const setLink = (blob) => {
+          if (!blob) return;
+          if (this.downloadLink.href) URL.revokeObjectURL(this.downloadLink.href);
+          const url = URL.createObjectURL(blob);
+          this.downloadLink.href = url;
+          const timestamp = new Date().toISOString().replace(/[-:.]/g, '').replace('T', '_').slice(0, 15);
+          this.downloadLink.download = `processed_image_${timestamp}.png`;
+          this.downloadLink.style.display = 'inline-flex';
+        };
+
+        if (this.canvas.toBlob) {
+          this.canvas.toBlob(setLink, 'image/png');
+        } else {
+          const dataURL = this.canvas.toDataURL('image/png');
+          const byteString = atob(dataURL.split(',')[1]);
+          const mimeString = dataURL.split(',')[0].split(':')[1].split(';')[0];
+          const ab = new ArrayBuffer(byteString.length);
+          const ia = new Uint8Array(ab);
+          for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+          setLink(new Blob([ab], { type: mimeString }));
+        }
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => new ImageMosaicApp());
+  </script>
 </body>
 </html>
